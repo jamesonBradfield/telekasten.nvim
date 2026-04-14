@@ -49,10 +49,17 @@ local function adapt_snacks_mappings(opts, snacks_opts)
     -- Define the action to update mock state and call Telekasten's function
     snacks_opts.actions[action_name] = function(picker, item)
       if item then
+        local full_path = item.file or item.text
+        -- Strip out the directory path, leaving just the filename
+        local filename = full_path:match("([^/\\]+)$") or full_path
+        -- Strip out the .md extension for the clean Zettelkasten ID/title
+        local clean_title = filename:gsub("%.md$", "")
+
         M._mock_selection = {
-          value = item.file or item.text,
-          filename = item.file,
-          path = item.file,
+          [1] = clean_title,       -- Telescope string index
+          value = clean_title,     -- What gets inserted into [[ ]]
+          filename = full_path,    -- Kept intact for file operations
+          path = full_path,
           tag = item.text,
         }
       end
