@@ -1302,6 +1302,21 @@ local function find_files_sorted(opts)
     picker:find()
 end
 
+local function get_selection()
+    local tk_pickers = require("telekasten.pickers_abstract")
+    if tk_pickers.get_picker() ~= "telescope" and tk_pickers._mock_selection then
+        return tk_pickers._mock_selection
+    end
+    return action_state.get_selected_entry()
+end
+
+local function safe_close(prompt_bufnr)
+    local tk_pickers = require("telekasten.pickers_abstract")
+    if tk_pickers.get_picker() == "telescope" and prompt_bufnr then
+        actions.close(prompt_bufnr)
+    end
+end
+
 picker_actions.post_open = function()
     if M.Cfg.auto_set_filetype then
         vim.cmd("set ft=telekasten")
@@ -1312,13 +1327,19 @@ picker_actions.post_open = function()
 end
 
 picker_actions.on_select_default = function(path)
-    actions.close(action_state.get_current_picker().prompt_bufnr)
+    local current_picker = action_state.get_current_picker()
+    if current_picker then
+        safe_close(current_picker.prompt_bufnr)
+    else
+        -- Just call safe_close with nil when not using Telescope
+        safe_close(nil)
+    end
     vim.cmd("edit " .. path)
     picker_actions.post_open()
 end
 
 picker_actions.select_default = function(prompt_bufnr)
-    local selection = action_state.get_selected_entry()
+    local selection = get_selection()
     local path = selection.path or selection.value
     picker_actions.on_select_default(path)
 end
@@ -1326,7 +1347,7 @@ end
 function picker_actions.close(opts)
     opts = opts or {}
     return function(prompt_bufnr)
-        actions.close(prompt_bufnr)
+        safe_close(prompt_bufnr)
         if opts.erase then
             if fileutils.file_exists(opts.erase_file) then
                 vim.fn.delete(opts.erase_file)
@@ -1337,8 +1358,8 @@ end
 
 function picker_actions.paste_tag(opts)
     return function(prompt_bufnr)
-        actions.close(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
+        safe_close(prompt_bufnr)
+        local selection = get_selection()
         vim.api.nvim_put({ selection.value.tag }, "", true, true)
         if opts.insert_after_inserting or opts.i then
             vim.api.nvim_feedkeys("A", "m", false)
@@ -1350,9 +1371,9 @@ function picker_actions.yank_tag(opts)
     return function(prompt_bufnr)
         opts = opts or {}
         if opts.close_after_yanking then
-            actions.close(prompt_bufnr)
+            safe_close(prompt_bufnr)
         end
-        local selection = action_state.get_selected_entry()
+        local selection = get_selection()
         vim.fn.setreg('"', selection.value.tag)
         print("yanked " .. selection.value.tag)
     end
@@ -1362,8 +1383,8 @@ function picker_actions.paste_link(opts)
     opts = opts or {}
     opts.subdirs_in_links = opts.subdirs_in_links or M.Cfg.subdirs_in_links
     return function(prompt_bufnr)
-        actions.close(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
+        safe_close(prompt_bufnr)
+        local selection = get_selection()
         local filepath = selection.filename or selection.value
 
         -- Check if file is external to current vault (auto-detect)
@@ -1401,9 +1422,9 @@ function picker_actions.yank_link(opts)
         opts = opts or {}
         opts.subdirs_in_links = opts.subdirs_in_links or M.Cfg.subdirs_in_links
         if opts.close_after_yanking then
-            actions.close(prompt_bufnr)
+            safe_close(prompt_bufnr)
         end
-        local selection = action_state.get_selected_entry()
+        local selection = get_selection()
         local filepath = selection.filename or selection.value
 
         -- Check if file is external to current vault (auto-detect)
@@ -1436,8 +1457,8 @@ end
 
 function picker_actions.paste_img_link(opts)
     return function(prompt_bufnr)
-        actions.close(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
+        safe_close(prompt_bufnr)
+        local selection = get_selection()
         local fn = selection.value
         fn = make_relative_path(vim.fn.expand("%:p"), fn, "/")
         local imglink = "![](" .. fn .. ")"
@@ -1452,9 +1473,9 @@ function picker_actions.yank_img_link(opts)
     return function(prompt_bufnr)
         opts = opts or {}
         if opts.close_after_yanking then
-            actions.close(prompt_bufnr)
+            safe_close(prompt_bufnr)
         end
-        local selection = action_state.get_selected_entry()
+        local selection = get_selection()
         local fn = selection.value
         fn = make_relative_path(vim.fn.expand("%:p"), fn, "/")
         local imglink = "![](" .. fn .. ")"
@@ -1849,7 +1870,7 @@ local function InsertLink(opts)
         end
 
         if opts.with_live_grep then
-            require("telekasten.pickers_abstract").grep_string({
+            require("telekasten.pickers_abstract").live_grep_with_options({
                 prompt_title = "Insert link to note with live grep",
                 cwd = cwd,
                 on_select = on_select,
@@ -1857,7 +1878,7 @@ local function InsertLink(opts)
                 find_command = find_command,
             })
         else
-            require("telekasten.pickers_abstract").find_files({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Insert link to note",
                 cwd = cwd,
                 on_select = on_select,
@@ -1939,7 +1960,7 @@ local function PreviewImg(opts)
                 filter_extensions = M.Cfg.media_extensions,
                 preview_type = "media",
                 on_select = function(path)
-                    actions.close(action_state.get_current_picker().prompt_bufnr)
+                    safe_close(action_state.get_current_picker().prompt_bufnr)
                 end,
                 attach_mappings = function(prompt_bufnr, map)
                     map("i", "<c-y>", picker_actions.yank_img_link(opts))
@@ -1980,7 +2001,7 @@ local function BrowseImg(opts)
             filter_extensions = M.Cfg.media_extensions,
             preview_type = "media",
             on_select = function(path)
-                actions.close(action_state.get_current_picker().prompt_bufnr)
+                safe_close(action_state.get_current_picker().prompt_bufnr)
             end,
             attach_mappings = function(prompt_bufnr, map)
                 map("i", "<c-y>", picker_actions.yank_img_link(opts))
@@ -2198,13 +2219,13 @@ local function GotoDate(opts)
             end
             vim.cmd("e " .. fname)
         else
-            require("telekasten.pickers_abstract").find_files({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Goto day",
                 cwd = M.Cfg.dailies,
                 default_text = word,
                 find_command = M.Cfg.find_command,
                 on_select = function(path)
-                    actions.close(action_state.get_current_picker().prompt_bufnr)
+                    safe_close(action_state.get_current_picker().prompt_bufnr)
 
                     -- open the new note
                     if opts.calendar == true then
@@ -2306,7 +2327,7 @@ local function FindNotes(opts)
         local on_select = picker_actions.on_select_default
 
         if opts.with_live_grep then
-            require("telekasten.pickers_abstract").grep_string({
+            require("telekasten.pickers_abstract").live_grep_with_options({
                 prompt_title = "Find notes by live grep",
                 cwd = cwd,
                 find_command = find_command,
@@ -2315,7 +2336,7 @@ local function FindNotes(opts)
                 sort = sort,
             })
         else
-            require("telekasten.pickers_abstract").find_files({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Find notes by name",
                 cwd = cwd,
                 find_command = find_command,
@@ -2348,7 +2369,7 @@ local function InsertImgLink(opts)
             filter_extensions = M.Cfg.media_extensions,
             preview_type = "media",
             on_select = function(path)
-                actions.close(action_state.get_current_picker().prompt_bufnr)
+                safe_close(action_state.get_current_picker().prompt_bufnr)
                 local fn = path
                 fn = make_relative_path(vim.fn.expand("%:p"), fn, "/")
                 vim.api.nvim_put({ "![](" .. fn .. ")" }, "", true, true)
@@ -3625,7 +3646,7 @@ local function FindAllTags(opts)
                         show_link_counts = false,
                         templateDir = templateDir,
                     }
-                    actions.close(action_state.get_current_picker().prompt_bufnr)
+                    safe_close(action_state.get_current_picker().prompt_bufnr)
                     vim.schedule(function()
                         FollowLink(follow_opts)
                     end)
@@ -3905,7 +3926,7 @@ TelekastenCmd.command = function(subcommand)
                     -- important: actions.close(bufnr) is not enough
                     -- it resulted in: preview_img NOT receiving the prompt as default text
                     -- apparently it has sth to do with keeping insert mode
-                    actions._close(action_state.get_current_picker().prompt_bufnr, true)
+                    safe_close(action_state.get_current_picker().prompt_bufnr)
 
                     local selection = entry_value[3]
                     selection()

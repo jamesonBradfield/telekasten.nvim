@@ -26,6 +26,42 @@ local function resolve_path(path, cwd)
   return resolved_path
 end
 
+-- Mock selection storage for Snacks picker compatibility
+M._mock_selection = nil
+
+-- Helper to extract Telescope mappings and convert to Snacks actions
+local function adapt_snacks_mappings(opts, snacks_opts)
+  if not opts.attach_mappings then return end
+  
+  local extracted = {}
+  -- Mock telescope's map function to extract the keybinds
+  opts.attach_mappings(0, function(mode, key, func)
+    extracted[key] = func
+  end)
+
+  snacks_opts.win = snacks_opts.win or { input = { keys = {} } }
+  snacks_opts.actions = snacks_opts.actions or {}
+
+  for key, func in pairs(extracted) do
+    local action_name = "tk_action_" .. key:gsub("[%<%>%-]", "")
+    -- Map the key in snacks
+    snacks_opts.win.input.keys[key] = { action_name, mode = { "i", "n" } }
+    -- Define the action to update mock state and call Telekasten's function
+    snacks_opts.actions[action_name] = function(picker, item)
+      if item then
+        M._mock_selection = {
+          value = item.file or item.text,
+          filename = item.file,
+          path = item.file,
+          tag = item.text,
+        }
+      end
+      func(0) -- Execute the original Telekasten closure
+      picker:close()
+    end
+  end
+end
+
 -- declare locals for the nvim api stuff to avoid more lsp warnings
 local vim = vim or {
   notify = function(msg, level) print("Notify:", msg) end,
@@ -303,27 +339,17 @@ end
 
 function M._snacks_find_files_with_options(opts)
   local snacks = require("snacks")
+  local snacks_opts = { prompt = opts.prompt_title, cwd = opts.cwd }
+  if opts.search_pattern then snacks_opts.search = opts.search_pattern end
 
-  local snacks_opts = {
-    prompt = opts.prompt_title,
-    cwd = opts.cwd,
-  }
-
-  if opts.search_pattern then
-    snacks_opts.search = opts.search_pattern
-  end
-
-  -- Handle on_select callback for Snacks.nvim
   if opts.on_select then
-    snacks_opts.confirm = function(selected)
-      if selected then
-        opts.on_select(resolve_path(selected.file, snacks_opts.cwd))
-      end
+    snacks_opts.confirm = function(picker, item)
+      picker:close()
+      if item then opts.on_select(resolve_path(item.file, snacks_opts.cwd)) end
     end
-  elseif opts.attach_mappings then
-    -- snacks uses confirm/actions instead of attach_mappings
   end
 
+  adapt_snacks_mappings(opts, snacks_opts)
   snacks.picker.files(snacks_opts)
 end
 
@@ -358,13 +384,16 @@ end
 
 function M._snacks_live_grep_with_options(opts)
   local snacks = require("snacks")
-  
-  local snacks_opts = {
-    prompt = opts.prompt_title,
-    cwd = opts.cwd,
-    search = opts.default_text,
-  }
-  
+  local snacks_opts = { prompt = opts.prompt_title, cwd = opts.cwd, search = opts.default_text }
+
+  if opts.on_select then
+    snacks_opts.confirm = function(picker, item)
+      picker:close()
+      if item then opts.on_select(resolve_path(item.file, snacks_opts.cwd)) end
+    end
+  end
+
+  adapt_snacks_mappings(opts, snacks_opts)
   snacks.picker.grep(snacks_opts)
 end
 
