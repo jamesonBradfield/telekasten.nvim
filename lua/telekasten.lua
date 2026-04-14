@@ -1260,9 +1260,14 @@ local function find_files_sorted(opts)
         previewer = media_preview.new(opts)
     end
 
+    opts.on_select = opts.on_select or picker_actions.on_select_default
     opts.attach_mappings = opts.attach_mappings
-        or function(_, _)
-            actions.select_default:replace(picker_actions.select_default)
+        or function(prompt_bufnr, map)
+            map("i", "<c-y>", picker_actions.yank_link(opts))
+            map("i", "<c-i>", picker_actions.paste_link(opts))
+            map("n", "<c-y>", picker_actions.yank_link(opts))
+            map("n", "<c-i>", picker_actions.paste_link(opts))
+            return true
         end
 
     local picker = pickers.new(opts, {
@@ -1306,10 +1311,16 @@ picker_actions.post_open = function()
     end
 end
 
-picker_actions.select_default = function(prompt_bufnr)
-    local ret = action_set.select(prompt_bufnr, "default")
+picker_actions.on_select_default = function(path)
+    actions.close(action_state.get_current_picker().prompt_bufnr)
+    vim.cmd("edit " .. path)
     picker_actions.post_open()
-    return ret
+end
+
+picker_actions.select_default = function(prompt_bufnr)
+    local selection = action_state.get_selected_entry()
+    local path = selection.path or selection.value
+    picker_actions.on_select_default(path)
 end
 
 function picker_actions.close(opts)
@@ -1474,25 +1485,22 @@ local function FindDailyNotes(opts)
         local fname = M.Cfg.dailies .. "/" .. today .. M.Cfg.extension
         local fexists = fileutils.file_exists(fname)
         local function picker()
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Find daily note",
                 cwd = M.Cfg.dailies,
                 find_command = M.Cfg.find_command,
                 search_pattern = "%d%d%d%d%-%d%d%-%d%d",
                 search_depth = 1,
+                on_select = picker_actions.on_select_default,
                 attach_mappings = function(_, map)
-                    actions.select_default:replace(
-                        picker_actions.select_default
-                    )
                     map("i", "<c-y>", picker_actions.yank_link(opts))
                     map("i", "<c-i>", picker_actions.paste_link(opts))
                     map("n", "<c-y>", picker_actions.yank_link(opts))
                     map("n", "<c-i>", picker_actions.paste_link(opts))
-                    map("n", "<c-c>", picker_actions.close(opts))
-                    map("n", "<esc>", picker_actions.close(opts))
+                    map("i", "<c-cr>", picker_actions.paste_link(opts))
+                    map("n", "<c-cr>", picker_actions.paste_link(opts))
                     return true
                 end,
-                sort = M.Cfg.sort,
             })
         end
         if
@@ -1543,16 +1551,14 @@ local function FindWeeklyNotes(opts)
         local fexists = fileutils.file_exists(fname)
 
         local function picker()
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Find weekly note",
                 cwd = M.Cfg.weeklies,
                 find_command = M.Cfg.find_command,
                 search_pattern = "%d%d%d%d%-W%d+",
                 search_depth = 1,
+                on_select = picker_actions.on_select_default,
                 attach_mappings = function(_, map)
-                    actions.select_default:replace(
-                        picker_actions.select_default
-                    )
                     map("i", "<c-y>", picker_actions.yank_link(opts))
                     map("i", "<c-i>", picker_actions.paste_link(opts))
                     map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -1613,7 +1619,7 @@ local function FindMonthlyNotes(opts)
         local fname = M.Cfg.monthlies .. "/" .. title .. M.Cfg.extension
         local fexists = fileutils.file_exists(fname)
         local function picker()
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Find monthly note",
                 cwd = M.Cfg.monthlies,
                 find_command = M.Cfg.find_command,
@@ -1621,19 +1627,16 @@ local function FindMonthlyNotes(opts)
                     .. vim.pesc(M.Cfg.extension)
                     .. "$",
                 search_depth = 1,
+                on_select = picker_actions.on_select_default,
                 attach_mappings = function(_, map)
-                    actions.select_default:replace(
-                        picker_actions.select_default
-                    )
                     map("i", "<c-y>", picker_actions.yank_link(opts))
                     map("i", "<c-i>", picker_actions.paste_link(opts))
                     map("n", "<c-y>", picker_actions.yank_link(opts))
                     map("n", "<c-i>", picker_actions.paste_link(opts))
-                    map("n", "<c-c>", picker_actions.close(opts))
-                    map("n", "<esc>", picker_actions.close(opts))
+                    map("i", "<c-cr>", picker_actions.paste_link(opts))
+                    map("n", "<c-cr>", picker_actions.paste_link(opts))
                     return true
                 end,
-                sort = M.Cfg.sort,
             })
         end
         if
@@ -1687,7 +1690,7 @@ local function FindQuarterlyNotes(opts)
         local fname = M.Cfg.quarterlies .. "/" .. title .. M.Cfg.extension
         local fexists = fileutils.file_exists(fname)
         local function picker()
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Find quarterly note",
                 cwd = M.Cfg.quarterlies,
                 find_command = M.Cfg.find_command,
@@ -1695,19 +1698,16 @@ local function FindQuarterlyNotes(opts)
                     M.Cfg.extension
                 ) .. "$",
                 search_depth = 1,
+                on_select = picker_actions.on_select_default,
                 attach_mappings = function(_, map)
-                    actions.select_default:replace(
-                        picker_actions.select_default
-                    )
                     map("i", "<c-y>", picker_actions.yank_link(opts))
                     map("i", "<c-i>", picker_actions.paste_link(opts))
                     map("n", "<c-y>", picker_actions.yank_link(opts))
                     map("n", "<c-i>", picker_actions.paste_link(opts))
-                    map("n", "<c-c>", picker_actions.close(opts))
-                    map("n", "<esc>", picker_actions.close(opts))
+                    map("i", "<c-cr>", picker_actions.paste_link(opts))
+                    map("n", "<c-cr>", picker_actions.paste_link(opts))
                     return true
                 end,
-                sort = M.Cfg.sort,
             })
         end
         if
@@ -1758,25 +1758,22 @@ local function FindYearlyNotes(opts)
         local fname = M.Cfg.yearlies .. "/" .. title .. M.Cfg.extension
         local fexists = fileutils.file_exists(fname)
         local function picker()
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Find yearly note",
                 cwd = M.Cfg.yearlies,
                 find_command = M.Cfg.find_command,
                 search_pattern = "%d%d%d%d" .. vim.pesc(M.Cfg.extension) .. "$",
                 search_depth = 1,
+                on_select = picker_actions.on_select_default,
                 attach_mappings = function(_, map)
-                    actions.select_default:replace(
-                        picker_actions.select_default
-                    )
                     map("i", "<c-y>", picker_actions.yank_link(opts))
                     map("i", "<c-i>", picker_actions.paste_link(opts))
                     map("n", "<c-y>", picker_actions.yank_link(opts))
                     map("n", "<c-i>", picker_actions.paste_link(opts))
-                    map("n", "<c-c>", picker_actions.close(opts))
-                    map("n", "<esc>", picker_actions.close(opts))
+                    map("i", "<c-cr>", picker_actions.paste_link(opts))
+                    map("n", "<c-cr>", picker_actions.paste_link(opts))
                     return true
                 end,
-                sort = M.Cfg.sort,
             })
         end
         if
@@ -1826,26 +1823,6 @@ local function InsertLink(opts)
         local find_command = M.Cfg.find_command
         local sort = M.Cfg.sort
         local attach_mappings = function(prompt_bufnr, map)
-            actions.select_default:replace(function()
-                actions.close(prompt_bufnr)
-                local selection = action_state.get_selected_entry()
-                if selection == nil then
-                    selection = { filename = action_state.get_current_line() }
-                end
-                local pinfo = Pinfo:new({
-                    filepath = selection.filename or selection.value,
-                    opts,
-                })
-                vim.api.nvim_put(
-                    { "[[" .. pinfo.title .. "]]" },
-                    "",
-                    false,
-                    true
-                )
-                if opts.i then
-                    vim.api.nvim_feedkeys("a", "m", false)
-                end
-            end)
             map("i", "<c-y>", picker_actions.yank_link(opts))
             map("i", "<c-i>", picker_actions.paste_link(opts))
             map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -1855,18 +1832,35 @@ local function InsertLink(opts)
             return true
         end
 
+        local on_select = function(path)
+            local pinfo = Pinfo:new({
+                filepath = path,
+                opts,
+            })
+            vim.api.nvim_put(
+                { "[[" .. pinfo.title .. "]]" },
+                "",
+                false,
+                true
+            )
+            if opts.i then
+                vim.api.nvim_feedkeys("a", "m", false)
+            end
+        end
+
         if opts.with_live_grep then
-            builtin.live_grep({
+            require("telekasten.pickers_abstract").grep_string({
                 prompt_title = "Insert link to note with live grep",
                 cwd = cwd,
+                on_select = on_select,
                 attach_mappings = attach_mappings,
                 find_command = find_command,
-                sort = sort,
             })
         else
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files({
                 prompt_title = "Insert link to note",
                 cwd = cwd,
+                on_select = on_select,
                 attach_mappings = attach_mappings,
                 find_command = find_command,
                 sort = sort,
@@ -1937,26 +1931,23 @@ local function PreviewImg(opts)
         local fexists = fileutils.file_exists(imageDir .. "/" .. fname)
 
         if fexists == true then
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files_with_options({
                 prompt_title = "Preview image/media",
                 cwd = imageDir,
                 default_text = fname,
                 find_command = M.Cfg.find_command,
                 filter_extensions = M.Cfg.media_extensions,
                 preview_type = "media",
+                on_select = function(path)
+                    actions.close(action_state.get_current_picker().prompt_bufnr)
+                end,
                 attach_mappings = function(prompt_bufnr, map)
-                    actions.select_default:replace(function()
-                        actions.close(prompt_bufnr)
-                    end)
                     map("i", "<c-y>", picker_actions.yank_img_link(opts))
                     map("i", "<c-i>", picker_actions.paste_img_link(opts))
                     map("n", "<c-y>", picker_actions.yank_img_link(opts))
                     map("n", "<c-i>", picker_actions.paste_img_link(opts))
-                    map("i", "<c-cr>", picker_actions.paste_img_link(opts))
-                    map("n", "<c-cr>", picker_actions.paste_img_link(opts))
                     return true
                 end,
-                sort = M.Cfg.sort,
             })
         else
             print("File not found: " .. M.Cfg.home .. "/" .. fname)
@@ -1982,16 +1973,16 @@ local function BrowseImg(opts)
             return
         end
 
-        find_files_sorted({
+        require("telekasten.pickers_abstract").find_files_with_options({
             prompt_title = "Preview image/media",
             cwd = M.Cfg.home,
             find_command = M.Cfg.find_command,
             filter_extensions = M.Cfg.media_extensions,
             preview_type = "media",
+            on_select = function(path)
+                actions.close(action_state.get_current_picker().prompt_bufnr)
+            end,
             attach_mappings = function(prompt_bufnr, map)
-                actions.select_default:replace(function()
-                    actions.close(prompt_bufnr)
-                end)
                 map("i", "<c-y>", picker_actions.yank_img_link(opts))
                 map("i", "<c-i>", picker_actions.paste_img_link(opts))
                 map("n", "<c-y>", picker_actions.yank_img_link(opts))
@@ -2000,7 +1991,6 @@ local function BrowseImg(opts)
                 map("n", "<c-cr>", picker_actions.paste_img_link(opts))
                 return true
             end,
-            sort = M.Cfg.sort,
         })
     end)
 end
@@ -2031,7 +2021,7 @@ local function FindFriends(opts)
         title = linkutils.remove_alias(title)
         title = title:gsub("^(%[)(.+)(%])$", "%2")
 
-        builtin.live_grep({
+        require("telekasten.pickers_abstract").live_grep_with_options({
             prompt_title = "Notes referencing `" .. title .. "`",
             cwd = M.Cfg.home,
             default_text = "\\[\\[" .. title .. "([#|].+)?\\]\\]",
@@ -2208,28 +2198,23 @@ local function GotoDate(opts)
             end
             vim.cmd("e " .. fname)
         else
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files({
                 prompt_title = "Goto day",
                 cwd = M.Cfg.dailies,
                 default_text = word,
                 find_command = M.Cfg.find_command,
-                attach_mappings = function(prompt_bufnr, map)
-                    actions.select_default:replace(function()
-                        actions.close(prompt_bufnr)
+                on_select = function(path)
+                    actions.close(action_state.get_current_picker().prompt_bufnr)
 
-                        -- open the new note
-                        if opts.calendar == true then
-                            vim.cmd("wincmd w")
-                        end
-                        vim.cmd("e " .. fname)
-                        picker_actions.post_open()
-                    end)
-                    map("i", "<c-y>", picker_actions.yank_link(opts))
-                    map("i", "<c-i>", picker_actions.paste_link(opts))
-                    map("n", "<c-y>", picker_actions.yank_link(opts))
-                    map("n", "<c-i>", picker_actions.paste_link(opts))
-                    map("n", "<c-c>", picker_actions.close(opts))
-                    map("n", "<esc>", picker_actions.close(opts))
+                    -- open the new note
+                    if opts.calendar == true then
+                        vim.cmd("wincmd w")
+                    end
+                    vim.cmd("e " .. path)
+                    picker_actions.post_open()
+                end,
+                attach_mappings = function(prompt_bufnr, map)
+                    -- Keep secondary mappings here if any
                     return true
                 end,
             })
@@ -2304,8 +2289,7 @@ local function FindNotes(opts)
         local cwd = M.Cfg.home
         local find_command = M.Cfg.find_command
         local sort = M.Cfg.sort
-        local attach_mappings = function(_, map)
-            actions.select_default:replace(picker_actions.select_default)
+        local attach_mappings = function(prompt_bufnr, map)
             map("i", "<c-y>", picker_actions.yank_link(opts))
             map("i", "<c-i>", picker_actions.paste_link(opts))
             map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -2319,20 +2303,24 @@ local function FindNotes(opts)
             return true
         end
 
+        local on_select = picker_actions.on_select_default
+
         if opts.with_live_grep then
-            builtin.live_grep({
+            require("telekasten.pickers_abstract").grep_string({
                 prompt_title = "Find notes by live grep",
                 cwd = cwd,
                 find_command = find_command,
                 attach_mappings = attach_mappings,
+                on_select = on_select,
                 sort = sort,
             })
         else
-            find_files_sorted({
+            require("telekasten.pickers_abstract").find_files({
                 prompt_title = "Find notes by name",
                 cwd = cwd,
                 find_command = find_command,
                 attach_mappings = attach_mappings,
+                on_select = on_select,
                 sort = sort,
             })
         end
@@ -2353,32 +2341,28 @@ local function InsertImgLink(opts)
             return
         end
 
-        find_files_sorted({
+        require("telekasten.pickers_abstract").find_files_with_options({
             prompt_title = "Find image/media",
             cwd = M.Cfg.home,
             find_command = M.Cfg.find_command,
             filter_extensions = M.Cfg.media_extensions,
             preview_type = "media",
+            on_select = function(path)
+                actions.close(action_state.get_current_picker().prompt_bufnr)
+                local fn = path
+                fn = make_relative_path(vim.fn.expand("%:p"), fn, "/")
+                vim.api.nvim_put({ "![](" .. fn .. ")" }, "", true, true)
+                if opts.i then
+                    vim.api.nvim_feedkeys("A", "m", false)
+                end
+            end,
             attach_mappings = function(prompt_bufnr, map)
-                actions.select_default:replace(function()
-                    actions.close(prompt_bufnr)
-                    local selection = action_state.get_selected_entry()
-                    local fn = selection.value
-                    fn = make_relative_path(vim.fn.expand("%:p"), fn, "/")
-                    vim.api.nvim_put({ "![](" .. fn .. ")" }, "", true, true)
-                    if opts.i then
-                        vim.api.nvim_feedkeys("A", "m", false)
-                    end
-                end)
                 map("i", "<c-y>", picker_actions.yank_img_link(opts))
                 map("i", "<c-i>", picker_actions.paste_img_link(opts))
                 map("n", "<c-y>", picker_actions.yank_img_link(opts))
                 map("n", "<c-i>", picker_actions.paste_img_link(opts))
-                map("i", "<c-cr>", picker_actions.paste_img_link(opts))
-                map("n", "<c-cr>", picker_actions.paste_img_link(opts))
                 return true
             end,
-            sort = M.Cfg.sort,
         })
     end)
 end
@@ -2401,7 +2385,7 @@ local function SearchNotes(opts)
             return
         end
 
-        builtin.live_grep({
+        require("telekasten.pickers_abstract").live_grep_with_options({
             prompt_title = "Search in notes",
             cwd = M.Cfg.home,
             search_dirs = { M.Cfg.home },
@@ -2446,7 +2430,7 @@ local function ShowBacklinks(opts)
         local escaped_title = string.gsub(title, "%(", "\\(")
         escaped_title = string.gsub(escaped_title, "%)", "\\)")
 
-        builtin.live_grep({
+        require("telekasten.pickers_abstract").live_grep_with_options({
             results_title = "Backlinks to " .. title,
             prompt_title = "Search",
             cwd = M.Cfg.home,
@@ -2501,29 +2485,25 @@ local function on_create_with_template(opts, title)
         return
     end
 
-    find_files_sorted({
+    require("telekasten.pickers_abstract").find_files_with_options({
         prompt_title = "Select template...",
         cwd = M.Cfg.templates,
         find_command = M.Cfg.find_command,
+        on_select = function(template_path)
+            create_note_from_template(
+                title,
+                uuid,
+                fname,
+                template_path,
+                pinfo.calendar_info,
+                function()
+                    -- open the new note
+                    vim.cmd("e " .. fname)
+                    picker_actions.post_open()
+                end
+            )
+        end,
         attach_mappings = function(prompt_bufnr, map)
-            actions.select_default:replace(function()
-                actions.close(prompt_bufnr)
-                -- local template = M.Cfg.templates .. "/" .. action_state.get_selected_entry().value
-                local template = action_state.get_selected_entry().value
-                -- TODO: pass in the calendar_info returned from the pinfo
-                create_note_from_template(
-                    title,
-                    uuid,
-                    fname,
-                    template,
-                    pinfo.calendar_info,
-                    function()
-                        -- open the new note
-                        vim.cmd("e " .. fname)
-                        picker_actions.post_open()
-                    end
-                )
-            end)
             map("i", "<c-y>", picker_actions.yank_link(opts))
             map("i", "<c-i>", picker_actions.paste_link(opts))
             map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -2575,13 +2555,13 @@ local function on_create(opts, title)
     local fname = pinfo.filepath
 
     local function picker()
-        find_files_sorted({
+        require("telekasten.pickers_abstract").find_files_with_options({
             prompt_title = "Created note...",
             cwd = pinfo.root_dir,
             default_text = generate_note_filename(uuid, title),
             find_command = M.Cfg.find_command,
+            on_select = picker_actions.on_select_default,
             attach_mappings = function(_, map)
-                actions.select_default:replace(picker_actions.select_default)
                 map("i", "<c-y>", picker_actions.yank_link(opts))
                 map("i", "<c-i>", picker_actions.paste_link(opts))
                 map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -2761,25 +2741,26 @@ local function FollowLink(opts)
                 -- check if fname exists anywhere
                 local pinfo = Pinfo:new({ title = title })
                 local function picker()
-                    find_files_sorted({
-                        prompt_title = "Follow link to note...",
-                        cwd = pinfo.root_dir,
-                        default_text = title,
-                        find_command = M.Cfg.find_command,
-                        attach_mappings = function(_, map)
-                            actions.select_default:replace(
-                                picker_actions.select_default
-                            )
-                            map("i", "<c-y>", picker_actions.yank_link(opts))
-                            map("i", "<c-i>", picker_actions.paste_link(opts))
-                            map("n", "<c-y>", picker_actions.yank_link(opts))
-                            map("n", "<c-i>", picker_actions.paste_link(opts))
-                            map("n", "<c-c>", picker_actions.close(opts))
-                            map("n", "<esc>", picker_actions.close(opts))
-                            return true
-                        end,
-                        sort = M.Cfg.sort,
-                    })
+            require("telekasten.pickers_abstract").find_files_with_options({
+                prompt_title = "Follow link to note...",
+                cwd = pinfo.root_dir,
+                default_text = title,
+                on_select = function(path)
+                    vim.cmd("edit " .. vim.fn.fnameescape(path))
+                    picker_actions.post_open()
+                end,
+                attach_mappings = function(_, map)
+                    map("i", "<c-y>", picker_actions.yank_link(opts))
+                    map("i", "<c-i>", picker_actions.paste_link(opts))
+                    map("n", "<c-y>", picker_actions.yank_link(opts))
+                    map("n", "<c-i>", picker_actions.paste_link(opts))
+                    map("n", "<c-c>", picker_actions.close(opts))
+                    map("n", "<esc>", picker_actions.close(opts))
+                    return true
+                end,
+                find_command = M.Cfg.find_command,
+                sort = M.Cfg.sort,
+            })
                 end
 
                 if
@@ -3085,12 +3066,13 @@ local function FollowLink(opts)
                 opts.cwd
             )
 
-            -- builtin.live_grep({
+            -- require("telekasten.pickers_abstract").live_grep_with_options({
             local picker = pickers.new(opts, {
                 cwd = cwd,
                 prompt_title = "Notes referencing `" .. title .. "`",
                 default_text = search_pattern,
                 initial_mode = "insert",
+                on_select = picker_actions.on_select_default,
                 -- link to specific file (a daily file): [[2021-02-22]]
                 -- link to heading in specific file (a daily file): [[2021-02-22#Touchpoint]]
                 -- link to heading globally [[#Touchpoint]]
@@ -3100,9 +3082,6 @@ local function FollowLink(opts)
                 previewer = conf.grep_previewer(opts),
                 sorter = sorters.highlighter_only(opts),
                 attach_mappings = function(_, map)
-                    actions.select_default:replace(
-                        picker_actions.select_default
-                    )
                     map("i", "<c-y>", picker_actions.yank_link(opts))
                     map("i", "<c-i>", picker_actions.paste_link(opts))
                     map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -3149,15 +3128,13 @@ local function GotoThisWeek(opts)
                 end
                 vim.cmd("e " .. fname)
             else
-                find_files_sorted({
+                require("telekasten.pickers_abstract").find_files_with_options({
                     prompt_title = "Goto this week:",
                     cwd = M.Cfg.weeklies,
                     default_text = title,
                     find_command = M.Cfg.find_command,
+                    on_select = picker_actions.on_select_default,
                     attach_mappings = function(_, map)
-                        actions.select_default:replace(
-                            picker_actions.select_default
-                        )
                         map("i", "<c-y>", picker_actions.yank_link(opts))
                         map("i", "<c-i>", picker_actions.paste_link(opts))
                         map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -3228,15 +3205,13 @@ local function GotoThisMonth(opts)
                 end
                 vim.cmd("e " .. fname)
             else
-                find_files_sorted({
+                require("telekasten.pickers_abstract").find_files_with_options({
                     prompt_title = "Goto this month:",
                     cwd = M.Cfg.monthlies,
                     default_text = title,
                     find_command = M.Cfg.find_command,
+                    on_select = picker_actions.on_select_default,
                     attach_mappings = function(_, map)
-                        actions.select_default:replace(
-                            picker_actions.select_default
-                        )
                         map("i", "<c-y>", picker_actions.yank_link(opts))
                         map("i", "<c-i>", picker_actions.paste_link(opts))
                         map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -3308,15 +3283,13 @@ local function GotoThisQuarter(opts)
                 end
                 vim.cmd("e " .. fname)
             else
-                find_files_sorted({
+                require("telekasten.pickers_abstract").find_files_with_options({
                     prompt_title = "Goto this quarter:",
                     cwd = M.Cfg.quarterlies,
                     default_text = title,
                     find_command = M.Cfg.find_command,
+                    on_select = picker_actions.on_select_default,
                     attach_mappings = function(_, map)
-                        actions.select_default:replace(
-                            picker_actions.select_default
-                        )
                         map("i", "<c-y>", picker_actions.yank_link(opts))
                         map("i", "<c-i>", picker_actions.paste_link(opts))
                         map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -3387,15 +3360,13 @@ local function GotoThisYear(opts)
                 end
                 vim.cmd("e " .. fname)
             else
-                find_files_sorted({
+                require("telekasten.pickers_abstract").find_files_with_options({
                     prompt_title = "Goto this year:",
                     cwd = M.Cfg.yearlies,
                     default_text = title,
                     find_command = M.Cfg.find_command,
+                    on_select = picker_actions.on_select_default,
                     attach_mappings = function(_, map)
-                        actions.select_default:replace(
-                            picker_actions.select_default
-                        )
                         map("i", "<c-y>", picker_actions.yank_link(opts))
                         map("i", "<c-i>", picker_actions.paste_link(opts))
                         map("n", "<c-y>", picker_actions.yank_link(opts))
@@ -3646,21 +3617,20 @@ local function FindAllTags(opts)
                     end,
                 }),
                 sorter = conf.generic_sorter(opts),
-                attach_mappings = function(prompt_bufnr, map)
-                    actions.select_default:replace(function()
-                        -- actions for insert tag, default action: search for tag
-                        local selection =
-                            action_state.get_selected_entry().value.tag
-                        local follow_opts = {
-                            follow_tag = selection,
-                            show_link_counts = false,
-                            templateDir = templateDir,
-                        }
-                        actions._close(prompt_bufnr, false)
-                        vim.schedule(function()
-                            FollowLink(follow_opts)
-                        end)
+                on_select = function(entry_value)
+                    -- actions for insert tag, default action: search for tag
+                    local selection = entry_value.tag
+                    local follow_opts = {
+                        follow_tag = selection,
+                        show_link_counts = false,
+                        templateDir = templateDir,
+                    }
+                    actions.close(action_state.get_current_picker().prompt_bufnr)
+                    vim.schedule(function()
+                        FollowLink(follow_opts)
                     end)
+                end,
+                attach_mappings = function(prompt_bufnr, map)
                     map("i", "<c-y>", picker_actions.yank_tag(opts))
                     map("i", "<c-i>", picker_actions.paste_tag(opts))
                     map("n", "<c-y>", picker_actions.yank_tag(opts))
@@ -3931,17 +3901,16 @@ TelekastenCmd.command = function(subcommand)
                     end,
                 }),
                 sorter = conf.generic_sorter(opts),
-                attach_mappings = function(prompt_bufnr, _)
-                    actions.select_default:replace(function()
-                        -- important: actions.close(bufnr) is not enough
-                        -- it resulted in: preview_img NOT receiving the prompt as default text
-                        -- apparently it has sth to do with keeping insert mode
-                        actions._close(prompt_bufnr, true)
+                on_select = function(entry_value)
+                    -- important: actions.close(bufnr) is not enough
+                    -- it resulted in: preview_img NOT receiving the prompt as default text
+                    -- apparently it has sth to do with keeping insert mode
+                    actions._close(action_state.get_current_picker().prompt_bufnr, true)
 
-                        local selection =
-                            action_state.get_selected_entry().value[3]
-                        selection()
-                    end)
+                    local selection = entry_value[3]
+                    selection()
+                end,
+                attach_mappings = function(prompt_bufnr, _)
                     return true
                 end,
             })
